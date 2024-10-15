@@ -15,14 +15,14 @@ document.addEventListener('DOMContentLoaded', ()=>{  //ensure the function is ca
       .then(data=>{ //this is where you can work on the data object
         // console.log(data)
         const{title, runtime, capacity, showtime, tickets_sold, description, poster} = data
-        const ticketsAvailable = capacity - tickets_sold
+        const currentTickets = capacity - tickets_sold
 
         document.getElementById('poster').src = poster;
         document.getElementById('title').innerText = title;
         document.getElementById('runtime').innerText = `Runtime: ${runtime} minutes`;
         document.getElementById('film-info').innerText = description
         document.getElementById('showtime').innerText = `Showtime: ${showtime}`;
-        document.getElementById('ticket-num').innerText = ticketsAvailable;
+        document.getElementById('ticket-num').innerText = currentTickets;
 
       })
       .catch(error=>{  //the catch is used for when the promise is not successful n thus bringing an erroe
@@ -87,57 +87,63 @@ function deleteFilm(li) {  //creating a function that deletes a movie title in t
 }
 
 //3 and 5
-document.getElementById('buy-ticket').addEventListener('click', ()=>{  //when the button to buy a ticket is pressed......patch
-  const newTicketsSold = 20;  //will go to the tickets_sold
+document.addEventListener('DOMContentLoaded', async () => {  //use async and await functions to get the data and change it later
+  const display = document.getElementById('ticket-num');
+  const reduceButton = document.getElementById('buy-ticket');
 
-fetch('http://localhost:3000/films/1', {  //using the patch method to update data from the backend
-    method: 'PATCH',
-    headers: {
-        'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ tickets_sold: newTicketsSold })  //in the backend what do you want to change and how do you want it to be after change
-})
-.then(response => {
-    if (!response.ok) {
-        throw new Error('Network response was not ok');
-    }
-    return response.json();
-})
-.then(data => {
-    console.log('Tickets updated:', data);
-    if (newTicketsSold === 30) {
-      const buyTicketButton = document.getElementById('buy-ticket');
-      buyTicketButton.textContent = 'Sold Out';
-      buyTicketButton.disabled = true; //to disable the button if sold out
-  }
-})
-.catch(error => {
-    console.error('your fetch aint working:', error);
-});
-})
+  // Get initial tickets sold from the backend
+  let currentTickets = await fetchTickets();  //a callback thet will be defined later
+  display.textContent = currentTickets;
 
-document.getElementById('buy-ticket').addEventListener('click', ()=>{  //post
-  const newTicketsSold = 20;
+  reduceButton.addEventListener('click', async () => {
+      if (currentTickets > 0) {
+          currentTickets--;
 
-  fetch('http://localhost:3000/films/1', {  //send the data to the server when the ticket_sold value is changed using post method
-    method: 'POST',
-    headers: {
-        'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-        tickets_sold: newTicketsSold
-    })
-  })
-  .then(response => {
-    if (!response.ok) {
-        throw new Error('Network response was not ok');
-    }
-    return response.json();
-  })
-  .then(data => {
-    console.log('Tickets updated:', data);
-  })
-  .catch(error => {
-    console.error('your fetch aint working:', error);
+          // change the display
+          display.textContent = currentTickets;
+
+          try {
+              // Update the backend using PATCH
+              const response = await fetch('http://localhost:3000/films/1', {
+                  method: 'PATCH',
+                  headers: {
+                      'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ tickets_sold: currentTickets }),
+              });
+
+              if (!response.ok) {
+                  throw new Error('Network response was not ok');
+              }
+
+              const data = await response.json();
+              console.log('Update successful:', data);
+          } catch (error) {
+              console.error('Error updating tickets:', error);
+              // Let the user know there was an error by reverting the displayed number if there's an error
+              currentTickets++; // Revertion
+              display.textContent = currentTickets; // Change display
+          }
+      } else {
+         const buyTicketButton = document.getElementById('buy-ticket');
+         buyTicketButton.textContent = 'Sold Out';
+         buyTicketButton.disabled = true; //to disable the button if sold out
+      }
   });
-})
+});
+
+// Def of the callback function to fetch the current ticket count from the API
+async function fetchTickets() {
+  try {
+      const response = await fetch('http://localhost:3000/films/1');
+      if (!response.ok) {
+          throw new Error('Network response was not ok');
+      }
+      const data = await response.json();
+      return data.tickets_sold;
+  } catch (error) {
+      console.error('Error fetching tickets:', error);
+      return 20; // Return the default value if there's an error
+  }
+}
+
